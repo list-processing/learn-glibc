@@ -737,6 +737,53 @@ __LINE__是当前行号
 如果n是1，当前行数是5，则处理后为：char str5[sizeof("1")]
 ```
 
+可以自己编写测试文件来测试宏的展开，编写文件
+
+`test.c`
+```
+# define ERR_MAP(n) n
+
+static const union sys_errname_t
+{
+  struct
+  {
+#define MSGSTRFIELD1(line) str##line
+#define MSGSTRFIELD(line)  MSGSTRFIELD1(line)
+#define S(n, str)         char MSGSTRFIELD(__LINE__)[sizeof(#n)];
+#include "test.h"
+#undef S
+  };
+  char str[0];
+} sys_errname = { {
+#define S(n, s) #n,
+#include "test.h"
+#undef S
+} };
+
+static const unsigned short sys_errnameidx[] =
+{
+#define S(n, s) \
+  [ERR_MAP(n)] = offsetof(union sys_errname_t, MSGSTRFIELD(__LINE__)),
+#include "test.h"
+#undef S
+};
+```
+
+`test.h`
+```
+# define N_(msgid)      msgid
+# define LOR 1
+S(0, N_("Success"))
+S(LOR, N_("No such file or directory"))
+
+```
+
+执行命令来查看预处理的结果
+```
+# gcc  -E test.c -o test.i
+# cat test.i
+```
+
 ## 备注
 
 * 使用GNU 扩展功能时，需要在源码中`# define _GNU_SOURCE`或者在gcc选项中`-D_GNU_SOURCE`
